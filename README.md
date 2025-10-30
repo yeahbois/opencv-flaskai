@@ -10,8 +10,7 @@ This project provides a real-time object detection application using YOLOv8, Fla
 - **Optimized for performance:** Includes optimizations such as model fusion and CUDA support for faster inference.
 - **Dynamic quality and FPS control:** Allows adjusting the image quality and target FPS from the web interface.
 
-![Uploading Screenshot_20251030_120620_Chrome.jpg…]()
-
+![Screenshot](img/screenshot.jpg "Screenshot")
 
 ## Requirements
 
