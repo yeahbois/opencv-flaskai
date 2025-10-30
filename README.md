@@ -24,8 +24,8 @@ This project provides a real-time object detection application using YOLOv8, Fla
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/yolov8-real-time.git
-   cd yolov8-real-time
+   git clone https://github.com/yeahbois/opencv-flaskai.git
+   cd opencv-flaskai
    ```
 
 2. **Install the dependencies:**
