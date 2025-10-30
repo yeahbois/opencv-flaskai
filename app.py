@@ -22,35 +22,28 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 print("Loading YOLOv8n (detection only)...")
 model = YOLO("yolov8n.pt")
 
-# Optimize model for faster inference
-model.fuse()  # Fuse Conv2D + BatchNorm layers for faster inference
+model.fuse()
 
-# Check if CUDA is available and use it
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model.to(device)
 print(f"Using device: {device}")
 
-# Warm up
 dummy = np.zeros((320, 320, 3), dtype=np.uint8)
 _ = model(dummy, verbose=False)
 print("✅ Ready!")
 
-# Client session management
 client_sessions = {}
 
-# Frame processing queue - increased size for better buffering
 frame_queue = Queue(maxsize=5)  
 result_queue = Queue(maxsize=5)  
 
-# Performance metrics
 processing = False
 last_frame_time = 0
 detection_fps = 0
 frame_count = 0
 last_fps_update = time.time()
-processing_times = []  # Track processing times for optimization
+processing_times = []
 
-# Background thread for processing frames
 def process_frames():
     global processing, detection_fps, frame_count, last_fps_update, processing_times
     
@@ -68,47 +61,36 @@ def process_frames():
                 if frame.shape[2] == 4:
                     frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
 
-                # Run inference with optimized settings
-                # Use higher resolution for better quality but still fast
                 results = model(frame, verbose=False, imgsz=320, conf=0.4)
                 res = results[0]
 
-                # Annotate with better quality
                 annotated = frame.copy()
                 
-                # Draw bounding boxes with better styling
                 for box, cls, conf in zip(res.boxes.xyxy, res.boxes.cls, res.boxes.conf):
                     x1, y1, x2, y2 = map(int, box)
                     label = f"{model.names[int(cls)]}: {conf:.2f}"
                     
-                    # Draw rectangle with thicker border
                     cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    
-                    # Draw label background
+
                     (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
                     cv2.rectangle(annotated, (x1, y1 - h - 10), (x1 + w, y1), (0, 255, 0), -1)
                     
-                    # Draw label text
                     cv2.putText(annotated, label, (x1, y1 - 5), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
 
-                # Encode with WebP for better quality at similar size
-                # WebP provides better compression than JPEG
                 _, buffer = cv2.imencode('.webp', annotated, [int(cv2.IMWRITE_WEBP_QUALITY), 70])
                 annotated_b64 = base64.b64encode(buffer).decode('utf-8')
                 
-                # Calculate detection FPS
                 frame_count += 1
                 current_time = time.time()
                 if current_time - last_fps_update >= 1.0:
                     detection_fps = frame_count
                     frame_count = 0
                     last_fps_update = current_time
-                
-                # Track processing time for optimization
+              
                 processing_time = (time.time() - start_time) * 1000
                 processing_times.append(processing_time)
-                if len(processing_times) > 10:  # Keep only last 10 measurements
+                if len(processing_times) > 10:
                     processing_times.pop(0)
                 
                 avg_processing_time = sum(processing_times) / len(processing_times)
@@ -124,7 +106,6 @@ def process_frames():
                 print(f"Processing time: {processing_time:.2f}ms, Detection FPS: {detection_fps}")
             except Exception as e:
                 print("❌ Error in process_frames:", e)
-                # Send error result to client
                 result_queue.put({
                     'error': str(e),
                     'session_id': frame_data['session_id']
@@ -132,13 +113,11 @@ def process_frames():
             finally:
                 processing = False
         else:
-            time.sleep(0.001)  # Small sleep to prevent CPU spinning
+            time.sleep(0.001)
 
-# Start the processing thread
 processing_thread = threading.Thread(target=process_frames, daemon=True)
 processing_thread.start()
 
-# Send results to client
 def send_results():
     while True:
         if not result_queue.empty():
@@ -151,9 +130,8 @@ def send_results():
                 else:
                     socketio.emit('result', result, room=session_id)
         else:
-            time.sleep(0.001)  # Small sleep to prevent CPU spinning
+            time.sleep(0.001)
 
-# Start the result sending thread
 result_thread = threading.Thread(target=send_results, daemon=True)
 result_thread.start()
 
@@ -422,10 +400,8 @@ def handle_disconnect():
 def handle_frame(data):
     global last_frame_time
     
-    # Add session ID to frame data
     data['session_id'] = request.sid
     
-    # Add frame to processing queue
     if not frame_queue.full():
         frame_queue.put(data)
         last_frame_time = time.time()
@@ -433,5 +409,5 @@ def handle_frame(data):
         print("Frame queue is full, dropping frame")
 
 if __name__ == '__main__':
-    print("🚀 Server running on http://0.0.0.0:5000")
+    print("Server running on http://0.0.0.0:5000")
     socketio.run(app, host='0.0.0.0', port=5000, debug=False, use_reloader=False)
